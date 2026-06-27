@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
-SATB Choir Conductor Simulator
-
+SATB Choir Conductor - Real Choral Music
+With Voice Controls Under Pattern Guide and Expanded Music Sheet
 """
 
 import cv2
@@ -46,18 +46,19 @@ class BeatDirection(Enum):
 
 @dataclass
 class VisualConstants:
-    WINDOW_WIDTH: int = 1600
-    WINDOW_HEIGHT: int = 1100
-    PATTERN_SIZE: int = 70
-    SCORE_PANEL_WIDTH: int = 350
-    SCORE_PANEL_HEIGHT: int = 450
+    WINDOW_WIDTH: int = 1850
+    WINDOW_HEIGHT: int = 1250
+    PATTERN_SIZE: int = 80
+    SCORE_PANEL_WIDTH: int = 380
+    SCORE_PANEL_HEIGHT: int = 500
     SCORE_PANEL_X_OFFSET: int = 20
     SCORE_PANEL_Y_OFFSET: int = 80
-    KEYBOARD_PANEL_HEIGHT: int = 120
-    INFO_PANEL_WIDTH: int = 340
-    INFO_PANEL_HEIGHT: int = 340
-    NOTATION_WIDTH: int = 720
-    NOTATION_HEIGHT: int = 620
+    KEYBOARD_PANEL_HEIGHT: int = 140
+    INFO_PANEL_WIDTH: int = 380
+    INFO_PANEL_HEIGHT: int = 380
+    NOTATION_WIDTH: int = 1000  # Expanded!
+    NOTATION_HEIGHT: int = 900  # Expanded!
+    LEFT_PANEL_WIDTH: int = 450
 
 
 # ============================================
@@ -336,7 +337,7 @@ class SATBScorePlayer:
     def is_completed(self) -> bool:
         return self._completed
 
-    def get_upcoming_chords(self, num: int = 3) -> List[Tuple[SATBChord, str]]:
+    def get_upcoming_chords(self, num: int = 4) -> List[Tuple[SATBChord, str]]:
         chords = []
         for i in range(self._chord_index, min(self._chord_index + num, len(self.current_score.chords))):
             chords.append((self.current_score.chords[i],
@@ -407,25 +408,25 @@ class VoiceStaffRenderer:
             color = (0, 200, 0) if is_current else (0, 0, 0)
             thickness = -1 if is_current else 1
 
-            cv2.circle(frame, (x, y_pos), 7, color, thickness)
-            cv2.line(frame, (x + 6, y_pos), (x + 6, y_pos - 20), (0, 0, 0), 1)
+            cv2.circle(frame, (x, y_pos), 8, color, thickness)
+            cv2.line(frame, (x + 7, y_pos), (x + 7, y_pos - 22), (0, 0, 0), 1)
 
             if offset < 0:
                 ledger_line_y = int(staff_top - line_spacing)
                 for _ in range(0, -offset, 2):
-                    cv2.line(frame, (x - 8, ledger_line_y), (x + 15, ledger_line_y), (0, 0, 0), 1)
+                    cv2.line(frame, (x - 10, ledger_line_y), (x + 18, ledger_line_y), (0, 0, 0), 1)
                     ledger_line_y -= int(line_spacing)
             elif offset > 4:
                 ledger_line_y = int(staff_top + 4 * line_spacing + line_spacing)
                 for _ in range(offset - 4, 0, -2):
-                    cv2.line(frame, (x - 8, ledger_line_y), (x + 15, ledger_line_y), (0, 0, 0), 1)
+                    cv2.line(frame, (x - 10, ledger_line_y), (x + 18, ledger_line_y), (0, 0, 0), 1)
                     ledger_line_y += int(line_spacing)
 
         return frame
 
 
 # ============================================
-# SATB NOTATION DISPLAY
+# SATB NOTATION DISPLAY - EXPANDED
 # ============================================
 
 class SATBNotationDisplay:
@@ -435,18 +436,22 @@ class SATBNotationDisplay:
     def draw_satb_score(self, frame: np.ndarray, score: SATBScore, current_chord_index: int,
                         chords: List[Tuple[SATBChord, str]], x: int, y: int, w: int, h: int) -> np.ndarray:
 
+        # Background
         cv2.rectangle(frame, (x, y), (x + w, y + h), (245, 245, 220), -1)
-        cv2.rectangle(frame, (x, y), (x + w, y + h), (100, 100, 100), 2)
+        cv2.rectangle(frame, (x, y), (x + w, y + h), (80, 80, 80), 2)
 
-        cv2.putText(frame, f"{score.name} - {score.composer}", (x + 20, y + 28),
+        # Title section
+        cv2.putText(frame, f"{score.name} - {score.composer}", (x + 25, y + 35),
                     cv2.FONT_HERSHEY_DUPLEX, 0.6, (0, 0, 0), 1)
         cv2.putText(frame, f"Time: {score.time_signature}  |  Tempo: {score.tempo_bpm} BPM  |  [ and ] to change piece",
-                    (x + 20, y + 50), cv2.FONT_HERSHEY_DUPLEX, 0.4, (80, 80, 80), 1)
+                    (x + 25, y + 60), cv2.FONT_HERSHEY_DUPLEX, 0.45, (80, 80, 80), 1)
 
+        # Voice section - more space for expanded panel
         voice_y_start = y + 85
-        voice_height = 125
-        staff_height = 75
-        separator_thickness = 3
+        voice_height = 185  # Taller for expanded view
+        staff_height = 110  # Taller staff
+        line_spacing = staff_height / 4
+        separator_thickness = 4
 
         voice_colors = {
             Voice.SOPRANO.value: (255, 235, 235),
@@ -455,7 +460,8 @@ class SATBNotationDisplay:
             Voice.BASS.value: (255, 255, 235),
         }
 
-        voice_spacing = voice_height + 15
+        voice_spacing = voice_height + 35
+
         voice_defs = [
             (Voice.SOPRANO.value, voice_y_start, True),
             (Voice.ALTO.value, voice_y_start + voice_spacing, True),
@@ -463,41 +469,49 @@ class SATBNotationDisplay:
             (Voice.BASS.value, voice_y_start + voice_spacing * 3, False),
         ]
 
+        # Draw separator lines between voices
         for idx in range(1, 4):
-            sep_y = voice_y_start + voice_spacing * idx - 8
+            sep_y = voice_y_start + voice_spacing * idx - 18
             cv2.line(frame, (x + 10, sep_y), (x + w - 10, sep_y), (100, 100, 150), separator_thickness)
+            cv2.line(frame, (x + 10, sep_y + 3), (x + w - 10, sep_y + 3), (150, 150, 200), 1)
 
         for voice_name, vy, is_treble in voice_defs:
+            # Voice section background
             bg_color = voice_colors.get(voice_name, (240, 240, 240))
             cv2.rectangle(frame, (x + 10, vy), (x + w - 10, vy + voice_height - 5), bg_color, -1)
             cv2.rectangle(frame, (x + 10, vy), (x + w - 10, vy + voice_height - 5), (120, 120, 150), 2)
 
-            cv2.putText(frame, voice_name, (x + 18, vy + 28),
-                        cv2.FONT_HERSHEY_DUPLEX, 0.65, (0, 0, 100), 1)
+            # Voice label
+            cv2.putText(frame, voice_name, (x + 18, vy + 38),
+                        cv2.FONT_HERSHEY_DUPLEX, 0.8, (0, 0, 100), 1)
 
-            staff_y = vy + 42
-            line_spacing = staff_height / 4
+            # Staff lines
+            staff_y = vy + 55
 
             for i in range(5):
                 line_y = int(staff_y + i * line_spacing)
-                cv2.line(frame, (x + 95, line_y), (x + w - 20, line_y), (0, 0, 0), 1)
+                cv2.line(frame, (x + 105, line_y), (x + w - 20, line_y), (0, 0, 0), 1)
 
-            clef_x = x + 72
+            # Clef - larger
+            clef_x = x + 80
             if is_treble:
-                cv2.putText(frame, "G", (clef_x, int(staff_y + 2 * line_spacing + 8)),
-                            cv2.FONT_HERSHEY_DUPLEX, 0.8, (0, 0, 0), 1)
+                cv2.putText(frame, "G", (clef_x, int(staff_y + 2 * line_spacing + 12)),
+                            cv2.FONT_HERSHEY_DUPLEX, 1.0, (0, 0, 0), 1)
             else:
-                cv2.putText(frame, "F", (clef_x + 2, int(staff_y + 2 * line_spacing + 8)),
-                            cv2.FONT_HERSHEY_DUPLEX, 0.8, (0, 0, 0), 1)
+                cv2.putText(frame, "F", (clef_x + 2, int(staff_y + 2 * line_spacing + 12)),
+                            cv2.FONT_HERSHEY_DUPLEX, 1.0, (0, 0, 0), 1)
 
+            # Time signature - first voice only
             if voice_name == Voice.SOPRANO.value:
-                cv2.putText(frame, score.time_signature, (x + 90, int(staff_y + 2 * line_spacing + 8)),
-                            cv2.FONT_HERSHEY_DUPLEX, 0.6, (0, 0, 0), 1)
+                cv2.putText(frame, score.time_signature, (x + 100, int(staff_y + 2 * line_spacing + 12)),
+                            cv2.FONT_HERSHEY_DUPLEX, 0.7, (0, 0, 0), 1)
 
-            note_pos_x = x + 130
-            note_spacing = 42
+            # Notes - start further right for more space
+            note_pos_x = x + 145
+            note_spacing = 55  # More space between notes
 
             for chord_idx, (chord, lyric) in enumerate(chords[:6]):
+                # Get note for this voice
                 if voice_name == Voice.SOPRANO.value:
                     note = chord.soprano
                 elif voice_name == Voice.ALTO.value:
@@ -509,64 +523,33 @@ class SATBNotationDisplay:
 
                 is_current = (chord_idx == 0)
 
+                # Draw the note
                 frame = self.staff_renderer.draw_note(
                     frame, note, note_pos_x, staff_y, line_spacing, is_treble, is_current
                 )
 
+                # Lyric - below staff
                 if lyric and is_current and len(lyric) > 0:
-                    cv2.putText(frame, lyric, (note_pos_x - 12, int(staff_y + staff_height + 18)),
-                                cv2.FONT_HERSHEY_DUPLEX, 0.45, (150, 0, 0), 1)
+                    cv2.putText(frame, lyric, (note_pos_x - 15, int(staff_y + staff_height + 28)),
+                                cv2.FONT_HERSHEY_DUPLEX, 0.55, (150, 0, 0), 1)
 
-                cv2.putText(frame, str(chord.beat_position), (note_pos_x - 3, int(staff_y + staff_height + 35)),
-                            cv2.FONT_HERSHEY_DUPLEX, 0.4, (80, 80, 80), 1)
+                # Beat number - below lyric
+                cv2.putText(frame, str(chord.beat_position), (note_pos_x - 4, int(staff_y + staff_height + 52)),
+                            cv2.FONT_HERSHEY_DUPLEX, 0.45, (80, 80, 80), 1)
 
                 note_pos_x += note_spacing
 
+            # Connecting line between notes
             if len(chords) > 1:
-                prev_x = x + 130
+                prev_x = x + 145
                 for chord_idx in range(1, min(len(chords), 6)):
-                    current_x = x + 130 + chord_idx * note_spacing
-                    cv2.line(frame, (prev_x + 15, int(staff_y + 2 * line_spacing)),
+                    current_x = x + 145 + chord_idx * note_spacing
+                    cv2.line(frame, (prev_x + 22, int(staff_y + 2 * line_spacing)),
                              (current_x, int(staff_y + 2 * line_spacing)), (100, 100, 100), 1)
                     prev_x = current_x
 
-        cv2.line(frame, (x + 90, voice_y_start), (x + 90, voice_y_start + voice_spacing * 4 - 10), (0, 0, 0), 4)
-
-        return frame
-
-    @staticmethod
-    def draw_voice_controls(frame: np.ndarray, audio_gen: SATBAudioGenerator,
-                            x: int, y: int, w: int, h: int) -> np.ndarray:
-        cv2.rectangle(frame, (x, y), (x + w, y + h), (35, 35, 55), -1)
-        cv2.rectangle(frame, (x, y), (x + w, y + h), (120, 120, 170), 2)
-
-        cv2.putText(frame, "VOICE CONTROLS", (x + w // 2 - 70, y + 28),
-                    cv2.FONT_HERSHEY_DUPLEX, 0.55, (255, 255, 0), 1)
-
-        voices = [Voice.SOPRANO.value, Voice.ALTO.value, Voice.TENOR.value, Voice.BASS.value]
-        button_y = y + 48
-        button_height = 30
-
-        for i, voice in enumerate(voices):
-            btn_y = button_y + i * (button_height + 8)
-
-            cv2.rectangle(frame, (x + 15, btn_y), (x + 155, btn_y + button_height), (55, 55, 75), -1)
-            volume = audio_gen.voice_volumes.get(voice, 0.3)
-            vol_width = int(volume * 140)
-            cv2.rectangle(frame, (x + 15, btn_y), (x + 15 + vol_width, btn_y + button_height), (0, 150, 0), -1)
-
-            cv2.putText(frame, voice, (x + 170, btn_y + 22),
-                        cv2.FONT_HERSHEY_DUPLEX, 0.5, (255, 255, 200), 1)
-
-            is_muted = voice in audio_gen.mute_voices
-            mute_color = (0, 0, 180) if is_muted else (0, 180, 0)
-            status_text = "MUTED" if is_muted else "ON"
-            cv2.putText(frame, status_text, (x + 250, btn_y + 22),
-                        cv2.FONT_HERSHEY_DUPLEX, 0.45, mute_color, 1)
-
-        cv2.putText(frame, "1-4: Mute  |  Shift+1-4: Volume +  |  [: Prev  |  ]: Next  |  a: RESYNC",
-                    (x + 15, button_y + 4 * (button_height + 8) + 20),
-                    cv2.FONT_HERSHEY_DUPLEX, 0.4, (180, 180, 200), 1)
+        # Left bar line
+        cv2.line(frame, (x + 100, voice_y_start), (x + 100, voice_y_start + voice_spacing * 4 - 10), (0, 0, 0), 4)
 
         return frame
 
@@ -887,7 +870,7 @@ class SATBConductor:
 
 
 # ============================================
-# SATB VISUALIZER
+# SATB VISUALIZER - NEW LAYOUT
 # ============================================
 
 class SATBVisualizer:
@@ -905,21 +888,21 @@ class SATBVisualizer:
 
     def draw_title(self, frame: np.ndarray) -> None:
         center_x = self.const.WINDOW_WIDTH // 2
-        cv2.putText(frame, "VIRTUAL CHOIR CONDUCTOR", (center_x - 220, 38),
-                    cv2.FONT_HERSHEY_DUPLEX, 1.0, (255, 255, 0), 1)
-        # cv2.putText(frame, "Learn how to conduct choir using this virtual training tool", (center_x - 170, 65),
-        #             cv2.FONT_HERSHEY_DUPLEX, 0.45, (200, 200, 0), 1)
+        cv2.putText(frame, "SATB CHOIR CONDUCTOR", (center_x - 250, 45),
+                    cv2.FONT_HERSHEY_DUPLEX, 1.1, (255, 255, 0), 1)
+        cv2.putText(frame, "Each voice has its own independent staff", (center_x - 200, 78),
+                    cv2.FONT_HERSHEY_DUPLEX, 0.5, (200, 200, 0), 1)
 
     def draw_pattern_guide(self, frame: np.ndarray, time_signature: str,
                            pattern: List[str], next_beat: str,
                            current_beat: int, show_completion: bool = False) -> np.ndarray:
-        center_x = 280
-        center_y = self.const.WINDOW_HEIGHT // 2 + 100
+        center_x = 225
+        center_y = self.const.WINDOW_HEIGHT // 2 - 80
         size = self.const.PATTERN_SIZE
 
         if show_completion:
-            cv2.putText(frame, "COMPLETED!", (center_x - 70, center_y),
-                        cv2.FONT_HERSHEY_DUPLEX, 1.2, (0, 255, 0), 2)
+            cv2.putText(frame, "COMPLETED!", (center_x - 80, center_y),
+                        cv2.FONT_HERSHEY_DUPLEX, 1.4, (0, 255, 0), 2)
             return frame
 
         if "4/4" in time_signature:
@@ -957,8 +940,8 @@ class SATBVisualizer:
 
         for i, point in enumerate(points):
             if i == 0:
-                cv2.circle(frame, point, 8, (100, 100, 150), -1)
-                cv2.circle(frame, point, 8, (150, 150, 255), 2)
+                cv2.circle(frame, point, 10, (100, 100, 150), -1)
+                cv2.circle(frame, point, 10, (150, 150, 255), 2)
                 continue
 
             beat_label = beat_labels[i]
@@ -967,24 +950,74 @@ class SATBVisualizer:
 
             if is_current:
                 circle_color = (0, 200, 0)
-                radius = 14
+                radius = 16
             elif is_next:
                 circle_color = (0, 150, 0)
-                radius = 12
+                radius = 14
             else:
                 circle_color = (50, 50, 150)
-                radius = 10
+                radius = 12
 
             cv2.circle(frame, point, radius, circle_color, -1)
             cv2.circle(frame, point, radius, (100, 100, 255), 2)
-            cv2.putText(frame, beat_label, (point[0] - 50, point[1] - 18),
+            cv2.putText(frame, beat_label, (point[0] - 55, point[1] - 22),
+                        cv2.FONT_HERSHEY_DUPLEX, 0.5, (255, 255, 200), 1)
+
+        # Draw pattern label
+        cv2.putText(frame, "CONDUCTING PATTERN", (center_x - 80, center_y + size + 50),
+                    cv2.FONT_HERSHEY_DUPLEX, 0.5, (255, 255, 0), 1)
+        cv2.putText(frame, time_signature, (center_x - 20, center_y + size + 80),
+                    cv2.FONT_HERSHEY_DUPLEX, 0.6, (0, 255, 0), 1)
+
+        return frame
+
+    def draw_voice_controls_panel(self, frame: np.ndarray, audio_gen: SATBAudioGenerator) -> np.ndarray:
+        """Voice controls positioned under the pattern guide on the left side"""
+        x = 20
+        y = self.const.WINDOW_HEIGHT // 2 + 150
+        w = 410
+        h = 200
+
+        cv2.rectangle(frame, (x, y), (x + w, y + h), (35, 35, 55), -1)
+        cv2.rectangle(frame, (x, y), (x + w, y + h), (120, 120, 170), 2)
+
+        cv2.putText(frame, "VOICE CONTROLS", (x + w // 2 - 75, y + 32),
+                    cv2.FONT_HERSHEY_DUPLEX, 0.55, (255, 255, 0), 1)
+
+        voices = [Voice.SOPRANO.value, Voice.ALTO.value, Voice.TENOR.value, Voice.BASS.value]
+        button_y = y + 55
+        button_height = 30
+
+        for i, voice in enumerate(voices):
+            btn_y = button_y + i * (button_height + 8)
+
+            # Volume slider
+            cv2.rectangle(frame, (x + 15, btn_y), (x + 155, btn_y + button_height), (55, 55, 75), -1)
+            volume = audio_gen.voice_volumes.get(voice, 0.3)
+            vol_width = int(volume * 140)
+            cv2.rectangle(frame, (x + 15, btn_y), (x + 15 + vol_width, btn_y + button_height), (0, 150, 0), -1)
+
+            # Voice label
+            cv2.putText(frame, voice, (x + 170, btn_y + 22),
                         cv2.FONT_HERSHEY_DUPLEX, 0.45, (255, 255, 200), 1)
+
+            # Mute indicator
+            is_muted = voice in audio_gen.mute_voices
+            mute_color = (0, 0, 180) if is_muted else (0, 180, 0)
+            status_text = "MUTED" if is_muted else "ON"
+            cv2.putText(frame, status_text, (x + 260, btn_y + 22),
+                        cv2.FONT_HERSHEY_DUPLEX, 0.4, mute_color, 1)
+
+        cv2.putText(frame, "Keys 1-4: Mute | Shift+1-4: Volume +",
+                    (x + 15, button_y + 4 * (button_height + 8) + 22),
+                    cv2.FONT_HERSHEY_DUPLEX, 0.35, (180, 180, 200), 1)
 
         return frame
 
     def draw_satb_score(self, frame: np.ndarray, stats: Dict) -> np.ndarray:
-        x = self.const.WINDOW_WIDTH - self.const.NOTATION_WIDTH - 20
-        y = 90
+        # Expanded score panel - takes most of the right side
+        x = self.const.LEFT_PANEL_WIDTH + 20
+        y = 100
         w = self.const.NOTATION_WIDTH
         h = self.const.NOTATION_HEIGHT
 
@@ -1002,78 +1035,73 @@ class SATBVisualizer:
 
         return frame
 
-    def draw_voice_controls(self, frame: np.ndarray, audio_gen: SATBAudioGenerator) -> np.ndarray:
-        x = self.const.WINDOW_WIDTH - self.const.NOTATION_WIDTH - 20
-        y = 90 + self.const.NOTATION_HEIGHT + 10
-        w = self.const.NOTATION_WIDTH
-        h = 170
-
-        frame = self.notation_display.draw_voice_controls(frame, audio_gen, x, y, w, h)
-        return frame
-
     def draw_info_panel(self, frame: np.ndarray, stats: Dict) -> np.ndarray:
+        # Info panel on the left, below voice controls
+        x = 20
+        y = self.const.WINDOW_HEIGHT // 2 + 150 + 200 + 20
+        w = 410
+        h = self.const.INFO_PANEL_HEIGHT - 30
+
         overlay = frame.copy()
-        cv2.rectangle(overlay, (15, 100), (15 + self.const.INFO_PANEL_WIDTH,
-                                           100 + self.const.INFO_PANEL_HEIGHT),
-                      (0, 0, 0), -1)
+        cv2.rectangle(overlay, (x, y), (x + w, y + h), (0, 0, 0), -1)
         frame = cv2.addWeighted(overlay, 0.75, frame, 0.25, 0)
 
-        y_offset = 125
+        y_offset = y + 20
 
         if stats['show_completion_banner']:
-            cv2.putText(frame, "CONGRATULATIONS!", (25, y_offset + 35),
-                        cv2.FONT_HERSHEY_DUPLEX, 0.8, (0, 255, 0), 1)
-            cv2.putText(frame, "You've completed the piece!", (25, y_offset + 70),
-                        cv2.FONT_HERSHEY_DUPLEX, 0.55, (0, 255, 0), 1)
-            cv2.putText(frame, "Press [ and ] for next score", (25, y_offset + 105),
-                        cv2.FONT_HERSHEY_DUPLEX, 0.5, (255, 200, 0), 1)
-            cv2.putText(frame, "or [r] to replay", (25, y_offset + 135),
-                        cv2.FONT_HERSHEY_DUPLEX, 0.5, (255, 200, 0), 1)
+            cv2.putText(frame, "CONGRATULATIONS!", (x + 15, y_offset + 30),
+                        cv2.FONT_HERSHEY_DUPLEX, 0.7, (0, 255, 0), 1)
+            cv2.putText(frame, "You've completed the piece!", (x + 15, y_offset + 60),
+                        cv2.FONT_HERSHEY_DUPLEX, 0.5, (0, 255, 0), 1)
+            cv2.putText(frame, "Press [ and ] for next score", (x + 15, y_offset + 90),
+                        cv2.FONT_HERSHEY_DUPLEX, 0.45, (255, 200, 0), 1)
+            cv2.putText(frame, "or [r] to replay", (x + 15, y_offset + 115),
+                        cv2.FONT_HERSHEY_DUPLEX, 0.45, (255, 200, 0), 1)
             return frame
 
         if stats.get('show_resync_message', False):
-            cv2.putText(frame, "RESYNC SUCCESSFUL!", (25, y_offset + 35),
+            cv2.putText(frame, "RESYNC SUCCESSFUL!", (x + 15, y_offset + 30),
                         cv2.FONT_HERSHEY_DUPLEX, 0.7, (0, 255, 0), 1)
-            cv2.putText(frame, "Continue conducting from the next DOWNBEAT", (25, y_offset + 65),
+            cv2.putText(frame, "Continue conducting from the next DOWNBEAT", (x + 15, y_offset + 60),
                         cv2.FONT_HERSHEY_DUPLEX, 0.5, (0, 255, 0), 1)
             return frame
 
-        cv2.putText(frame, "STATUS", (25, y_offset),
-                    cv2.FONT_HERSHEY_DUPLEX, 0.65, (255, 255, 0), 1)
+        cv2.putText(frame, "STATUS", (x + 15, y_offset),
+                    cv2.FONT_HERSHEY_DUPLEX, 0.6, (255, 255, 0), 1)
 
         cv2.putText(frame, f"Score: {stats['score_id']} - {stats['score_name']}",
-                    (25, y_offset + 35), cv2.FONT_HERSHEY_DUPLEX, 0.5, (255, 200, 0), 1)
+                    (x + 15, y_offset + 35), cv2.FONT_HERSHEY_DUPLEX, 0.45, (255, 200, 0), 1)
         cv2.putText(frame, f"Composer: {stats['composer']}",
-                    (25, y_offset + 60), cv2.FONT_HERSHEY_DUPLEX, 0.45, (200, 200, 200), 1)
-        cv2.putText(frame, f"Time Signature: {stats['time_signature']} ({stats['beats_per_measure']} beats)",
-                    (25, y_offset + 85), cv2.FONT_HERSHEY_DUPLEX, 0.45, (0, 255, 0), 1)
+                    (x + 15, y_offset + 58), cv2.FONT_HERSHEY_DUPLEX, 0.4, (200, 200, 200), 1)
+        cv2.putText(frame, f"Time: {stats['time_signature']} ({stats['beats_per_measure']} beats)",
+                    (x + 15, y_offset + 82), cv2.FONT_HERSHEY_DUPLEX, 0.4, (0, 255, 0), 1)
 
         if stats['has_tempo_error']:
             cv2.putText(frame, f"TEMPO: {stats['bpm']} / {stats['suggested_tempo']} BPM",
-                        (25, y_offset + 115), cv2.FONT_HERSHEY_DUPLEX, 0.5, (0, 150, 255), 1)
+                        (x + 15, y_offset + 108), cv2.FONT_HERSHEY_DUPLEX, 0.45, (0, 150, 255), 1)
             cv2.putText(frame, stats['tempo_error_msg'],
-                        (25, y_offset + 140), cv2.FONT_HERSHEY_DUPLEX, 0.4, (0, 150, 255), 1)
+                        (x + 15, y_offset + 130), cv2.FONT_HERSHEY_DUPLEX, 0.35, (0, 150, 255), 1)
             cv2.putText(frame, "Press 'a' to RESYNC",
-                        (25, y_offset + 162), cv2.FONT_HERSHEY_DUPLEX, 0.45, (0, 200, 255), 1)
+                        (x + 15, y_offset + 150), cv2.FONT_HERSHEY_DUPLEX, 0.4, (0, 200, 255), 1)
         else:
             cv2.putText(frame, f"Tempo: {stats['bpm']} / {stats['suggested_tempo']} BPM",
-                        (25, y_offset + 115), cv2.FONT_HERSHEY_DUPLEX, 0.5, (0, 255, 255), 1)
+                        (x + 15, y_offset + 108), cv2.FONT_HERSHEY_DUPLEX, 0.45, (0, 255, 255), 1)
 
         cv2.putText(frame, f"Beats: {stats['beats']}  |  Measures: {stats['measures']}",
-                    (25, y_offset + 148), cv2.FONT_HERSHEY_DUPLEX, 0.5, (0, 255, 255), 1)
+                    (x + 15, y_offset + 138), cv2.FONT_HERSHEY_DUPLEX, 0.45, (0, 255, 255), 1)
         cv2.putText(frame, f"Current Beat: {stats['current_beat']} / {stats['beats_per_measure']}",
-                    (25, y_offset + 178), cv2.FONT_HERSHEY_DUPLEX, 0.5, (255, 200, 100), 1)
+                    (x + 15, y_offset + 165), cv2.FONT_HERSHEY_DUPLEX, 0.45, (255, 200, 100), 1)
 
         if stats.get('current_lyric'):
             cv2.putText(frame, f"Lyric: {stats['current_lyric']}",
-                        (25, y_offset + 208), cv2.FONT_HERSHEY_DUPLEX, 0.55, (255, 150, 150), 1)
+                        (x + 15, y_offset + 192), cv2.FONT_HERSHEY_DUPLEX, 0.45, (255, 150, 150), 1)
 
         cv2.putText(frame, f"Progress: {stats['score_pos']} / {stats['score_total']} chords",
-                    (25, y_offset + 240), cv2.FONT_HERSHEY_DUPLEX, 0.45, (200, 200, 200), 1)
+                    (x + 15, y_offset + 220), cv2.FONT_HERSHEY_DUPLEX, 0.4, (200, 200, 200), 1)
 
         if stats['beats'] > 0 and not stats['show_completion_banner']:
-            cv2.putText(frame, f"FPS: {stats.get('fps', 0)}", (25, y_offset + 268),
-                        cv2.FONT_HERSHEY_DUPLEX, 0.4, (150, 150, 150), 1)
+            cv2.putText(frame, f"FPS: {stats.get('fps', 0)}", (x + 15, y_offset + 248),
+                        cv2.FONT_HERSHEY_DUPLEX, 0.35, (150, 150, 150), 1)
 
         return frame
 
@@ -1081,50 +1109,46 @@ class SATBVisualizer:
                                 current_beat: int, beats_per_measure: int,
                                 show_completion: bool = False, has_tempo_error: bool = False,
                                 show_resync: bool = False) -> np.ndarray:
-        x = self.const.WINDOW_WIDTH - self.const.SCORE_PANEL_WIDTH - self.const.SCORE_PANEL_X_OFFSET
-        y = self.const.WINDOW_HEIGHT - self.const.KEYBOARD_PANEL_HEIGHT - self.const.SCORE_PANEL_X_OFFSET - 120
+        x = self.const.LEFT_PANEL_WIDTH + 20 + self.const.NOTATION_WIDTH - 340
+        y = self.const.WINDOW_HEIGHT - 160
 
-        cv2.rectangle(frame, (x, y), (self.const.WINDOW_WIDTH - 40,
-                                      self.const.WINDOW_HEIGHT - 20),
-                      (35, 35, 55), -1)
-        cv2.rectangle(frame, (x, y), (self.const.WINDOW_WIDTH - 40,
-                                      self.const.WINDOW_HEIGHT - 20),
-                      (120, 120, 170), 2)
+        cv2.rectangle(frame, (x, y), (x + 340, y + 140), (35, 35, 55), -1)
+        cv2.rectangle(frame, (x, y), (x + 340, y + 140), (120, 120, 170), 2)
 
         if show_completion:
-            cv2.putText(frame, "SCORE COMPLETE!", (x + 65, y + 45),
-                        cv2.FONT_HERSHEY_DUPLEX, 0.65, (0, 255, 0), 1)
-            cv2.putText(frame, "Press [ and ] or [r]", (x + 70, y + 80),
-                        cv2.FONT_HERSHEY_DUPLEX, 0.5, (255, 200, 0), 1)
+            cv2.putText(frame, "SCORE COMPLETE!", (x + 50, y + 50),
+                        cv2.FONT_HERSHEY_DUPLEX, 0.6, (0, 255, 0), 1)
+            cv2.putText(frame, "Press [ and ] or [r]", (x + 50, y + 85),
+                        cv2.FONT_HERSHEY_DUPLEX, 0.45, (255, 200, 0), 1)
             return frame
 
         if show_resync:
-            cv2.putText(frame, "RESYNC SUCCESS!", (x + 65, y + 45),
-                        cv2.FONT_HERSHEY_DUPLEX, 0.6, (0, 255, 0), 1)
-            cv2.putText(frame, "Start from DOWNBEAT", (x + 75, y + 75),
-                        cv2.FONT_HERSHEY_DUPLEX, 0.5, (0, 255, 0), 1)
+            cv2.putText(frame, "RESYNC SUCCESS!", (x + 50, y + 50),
+                        cv2.FONT_HERSHEY_DUPLEX, 0.55, (0, 255, 0), 1)
+            cv2.putText(frame, "Start from DOWNBEAT", (x + 60, y + 85),
+                        cv2.FONT_HERSHEY_DUPLEX, 0.45, (0, 255, 0), 1)
             return frame
 
         if has_tempo_error:
-            cv2.putText(frame, "TEMPO ERROR!", (x + 75, y + 30),
-                        cv2.FONT_HERSHEY_DUPLEX, 0.55, (0, 150, 255), 1)
-            cv2.putText(frame, "Press 'a' to RESYNC", (x + 70, y + 60),
-                        cv2.FONT_HERSHEY_DUPLEX, 0.5, (0, 200, 255), 1)
-            cv2.putText(frame, "(Keeps music position)", (x + 65, y + 90),
+            cv2.putText(frame, "TEMPO ERROR!", (x + 60, y + 35),
+                        cv2.FONT_HERSHEY_DUPLEX, 0.5, (0, 150, 255), 1)
+            cv2.putText(frame, "Press 'a' to RESYNC", (x + 55, y + 65),
+                        cv2.FONT_HERSHEY_DUPLEX, 0.45, (0, 200, 255), 1)
+            cv2.putText(frame, "(Keeps music position)", (x + 50, y + 95),
                         cv2.FONT_HERSHEY_DUPLEX, 0.4, (200, 200, 200), 1)
             return frame
 
         next_beat_num = current_beat + 1 if current_beat < beats_per_measure else 1
         cv2.putText(frame, f"NEXT BEAT: {next_beat_num} / {beats_per_measure}",
-                    (x + 65, y + 30), cv2.FONT_HERSHEY_DUPLEX, 0.55, (255, 200, 0), 1)
-        cv2.putText(frame, "PRESS:", (x + 35, y + 65),
-                    cv2.FONT_HERSHEY_DUPLEX, 0.5, (255, 255, 0), 1)
+                    (x + 50, y + 35), cv2.FONT_HERSHEY_DUPLEX, 0.5, (255, 200, 0), 1)
+        cv2.putText(frame, "PRESS:", (x + 30, y + 75),
+                    cv2.FONT_HERSHEY_DUPLEX, 0.45, (255, 255, 0), 1)
 
         key_map = {
-            "DOWN": (120, 45, "DOWN"),
-            "LEFT": (80, 70, "LEFT"),
-            "RIGHT": (165, 70, "RIGHT"),
-            "UP": (120, 45, "UP")
+            "DOWN": (115, 50, "DOWN"),
+            "LEFT": (80, 80, "LEFT"),
+            "RIGHT": (160, 80, "RIGHT"),
+            "UP": (115, 50, "UP")
         }
 
         if next_beat in key_map:
@@ -1134,14 +1158,14 @@ class SATBVisualizer:
             cv2.rectangle(frame, (kx, ky), (kx + 80, ky + 30), (0, 100, 0), -1)
             cv2.rectangle(frame, (kx, ky), (kx + 80, ky + 30), (0, 255, 0), 2)
             cv2.putText(frame, key_name, (kx + 20, ky + 22),
-                        cv2.FONT_HERSHEY_DUPLEX, 0.5, (0, 255, 0), 1)
+                        cv2.FONT_HERSHEY_DUPLEX, 0.45, (0, 255, 0), 1)
 
         return frame
 
     def draw_error(self, frame: np.ndarray, error_msg: str, error_time: float) -> np.ndarray:
         if error_msg and time.time() - error_time < 1.5:
             center_x = self.const.WINDOW_WIDTH // 2
-            center_y = self.const.WINDOW_HEIGHT // 2 + 300
+            center_y = self.const.WINDOW_HEIGHT - 60
             (text_w, text_h), _ = cv2.getTextSize(error_msg, cv2.FONT_HERSHEY_DUPLEX, 0.55, 1)
             cv2.rectangle(frame, (center_x - text_w // 2 - 15, center_y - text_h - 10),
                           (center_x + text_w // 2 + 15, center_y + 15),
@@ -1156,14 +1180,14 @@ class SATBVisualizer:
     def draw_beat_flash(self, frame: np.ndarray, is_flash: bool, beat_name: str,
                         beat_number: int, beats_per_measure: int) -> np.ndarray:
         if is_flash:
-            center_x = 280
-            center_y = self.const.WINDOW_HEIGHT // 2 + 40
+            center_x = 225
+            center_y = self.const.WINDOW_HEIGHT // 2 - 120
             overlay = frame.copy()
-            cv2.circle(overlay, (center_x, center_y + 80), 70, (0, 255, 0), -1)
-            cv2.addWeighted(overlay, 0.25, frame, 0.75, 0, frame)
+            cv2.circle(overlay, (center_x, center_y + 90), 80, (0, 255, 0), -1)
+            cv2.addWeighted(overlay, 0.2, frame, 0.8, 0, frame)
             text = f"BEAT {beat_number}/{beats_per_measure}"
             (text_w, text_h), _ = cv2.getTextSize(text, cv2.FONT_HERSHEY_DUPLEX, 1.0, 1)
-            cv2.putText(frame, text, (center_x - text_w // 2, center_y),
+            cv2.putText(frame, text, (center_x - text_w // 2, center_y + 10),
                         cv2.FONT_HERSHEY_DUPLEX, 1.0, (0, 255, 0), 1)
         return frame
 
@@ -1171,7 +1195,7 @@ class SATBVisualizer:
         controls_text = "[m]Metronome  [r]RESET  [a]RESYNC  [:]PREV  []]NEXT  [s]Save  [q]Quit"
         (text_w, _), _ = cv2.getTextSize(controls_text, cv2.FONT_HERSHEY_DUPLEX, 0.5, 1)
         cv2.putText(frame, controls_text,
-                    (self.const.WINDOW_WIDTH // 2 - text_w // 2, self.const.WINDOW_HEIGHT - 20),
+                    (self.const.WINDOW_WIDTH // 2 - text_w // 2, self.const.WINDOW_HEIGHT - 15),
                     cv2.FONT_HERSHEY_DUPLEX, 0.5, (180, 180, 200), 1)
         return frame
 
@@ -1202,6 +1226,7 @@ class SATBConductorApp:
     def _print_welcome(self) -> None:
         print("=" * 70)
         print("SATB CHOIR CONDUCTOR")
+        print("Voice controls moved to left panel - Expanded music sheet")
         print("=" * 70)
         print("\nAvailable Choral Pieces:")
         for score in ChoralLibrary.get_all():
@@ -1220,10 +1245,6 @@ class SATBConductorApp:
         print("  Press 1-4 to mute/unmute voices:")
         print("    1 - Soprano   2 - Alto   3 - Tenor   4 - Bass")
         print("  Shift+1-4 to increase volume")
-        print("\n[DISPLAY]")
-        print("  Each voice displays notes on its own 5-line staff")
-        print("  Soprano & Alto: Treble clef (G clef)")
-        print("  Tenor & Bass: Bass clef (F clef)")
         print("=" * 70)
 
         stats = self.conductor.stats
@@ -1330,6 +1351,7 @@ class SATBConductorApp:
         else:
             stats_with_fps['fps'] = 0
 
+        # Draw pattern guide (left top)
         frame = self.visualizer.draw_pattern_guide(
             frame, stats['time_signature'],
             self.conductor.expected_pattern,
@@ -1337,9 +1359,17 @@ class SATBConductorApp:
             stats['current_beat'],
             stats['show_completion_banner']
         )
-        frame = self.visualizer.draw_satb_score(frame, stats_with_fps)
-        frame = self.visualizer.draw_voice_controls(frame, self.conductor._audio)
+
+        # Draw voice controls (left middle)
+        frame = self.visualizer.draw_voice_controls_panel(frame, self.conductor._audio)
+
+        # Draw info panel (left bottom)
         frame = self.visualizer.draw_info_panel(frame, stats_with_fps)
+
+        # Draw expanded score (right side)
+        frame = self.visualizer.draw_satb_score(frame, stats_with_fps)
+
+        # Draw keyboard indicator (right bottom)
         frame = self.visualizer.draw_keyboard_indicator(
             frame, stats['next_beat'],
             stats['current_beat'],
@@ -1348,12 +1378,19 @@ class SATBConductorApp:
             stats['has_tempo_error'],
             stats['show_resync_message']
         )
+
+        # Draw error message
         frame = self.visualizer.draw_error(frame, self._error_msg, self._error_time)
+
+        # Draw beat flash
         frame = self.visualizer.draw_beat_flash(
             frame, self.conductor.is_beat_flash, self.conductor.last_beat_name,
             stats['current_beat'], stats['beats_per_measure']
         )
+
+        # Draw controls
         frame = self.visualizer.draw_controls(frame, stats_with_fps['fps'])
+
         return frame
 
     def _print_summary(self) -> None:
